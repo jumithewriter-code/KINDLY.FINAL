@@ -1,0 +1,435 @@
+/* ===========================================================================
+   KINDLY — additions layered on top of the design stylesheet (kindly.css).
+   ---------------------------------------------------------------------------
+   Everything here is either
+     (a) an accessibility correction required to reach WCAG 2.2 AA, or
+     (b) a state the interactive design implied but did not draw
+         (loading, empty, error, offline, permission denied, dialogs, editors).
+   No decorative changes are made to the KINDLY visual identity.
+   =========================================================================== */
+
+/* --- 1. Per-child display preferences -------------------------------------
+   Applied to <html> so every rem-based size scales together. */
+html { font-size: calc(16px * var(--kindly-text-scale, 1)); }
+
+/* High contrast raises text and border contrast without changing the palette's
+   warmth. Verified against WCAG 1.4.3 / 1.4.11 in docs/accessibility-report.md. */
+:root[data-contrast='high'] {
+  --foreground: #1a1815;
+  --muted-foreground: #4a443c;
+  --border: #b7a98f;
+  --ring: #b3341a;
+  --coral: #c3391f;
+  --card: #ffffff;
+}
+
+/* Low-stimulation mode: less colour, no decorative art, no shadows. */
+:root[data-stimulation='low'] {
+  --shadow: none;
+  --blue: #f2f5f6;
+  --purple: #f4f2f8;
+  --mint: #f1f5f1;
+  --peach: #faf4ec;
+}
+:root[data-stimulation='low'] .tool-art,
+:root[data-stimulation='low'] .large-art,
+:root[data-stimulation='low'] .story-illustration span,
+:root[data-stimulation='low'] .preview-dots { display: none; }
+:root[data-stimulation='low'] .child-card { background: var(--card); }
+
+/* --- 2. Motion -------------------------------------------------------------
+   Animation is off unless the child's profile turns it on AND the operating
+   system is not asking for reduced motion. */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* --- 3. Focus and target size (WCAG 2.4.11, 2.5.8) ------------------------ */
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+button, a.button, [role='button'], input[type='checkbox'], input[type='radio'], select {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* Inline text links inside a paragraph are exempt (WCAG 2.5.8 inline exception). */
+.text-link, p a, small a { min-height: 0; min-width: 0; }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 18px;
+  background: var(--card);
+  color: var(--foreground);
+  border: 2px solid var(--ring);
+  border-radius: 0 0 12px 0;
+  font-weight: 800;
+}
+.skip-link:focus { left: 0; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* --- 4. States the design implied but did not draw ------------------------ */
+.state-block {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  padding: 40px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+.state-block h3 { margin: 0; font-size: 19px; letter-spacing: -0.4px; }
+.state-block p { margin: 0; color: var(--muted-foreground); font-size: 14px; max-width: 46ch; }
+.state-block .state-icon {
+  width: 52px; height: 52px; border-radius: 16px;
+  display: grid; place-items: center; background: var(--muted);
+}
+.state-block.state-error .state-icon { background: #fde3dc; color: #8c2b16; }
+.state-block.state-offline .state-icon { background: #fdf0d5; color: #6f5200; }
+.state-block.state-denied .state-icon { background: #eee9fc; color: #4a3b8c; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--muted) 25%, #fbf5ea 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  animation: kindly-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes kindly-shimmer { to { background-position: -200% 0; } }
+:root[data-motion='reduced'] .skeleton { animation: none; background: var(--muted); }
+
+.inline-error {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px 14px; border-radius: 12px;
+  background: #fde8e1; color: #7d2a15; font-size: 13.5px; font-weight: 600;
+  border: 1px solid #f2b9a7;
+}
+.inline-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--muted); color: var(--foreground); font-size: 13.5px;
+  border: 1px solid var(--border);
+}
+
+.offline-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; background: #fdf0d5; color: #5c4400;
+  border-bottom: 1px solid #e8d5a8; font-size: 13.5px; font-weight: 700;
+}
+
+/* --- 5. Dialogs ----------------------------------------------------------- */
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(41, 39, 36, 0.45);
+  display: grid; place-items: center; padding: 20px;
+}
+.dialog-panel {
+  background: var(--card); border-radius: 22px; border: 1px solid var(--border);
+  box-shadow: var(--shadow); padding: 26px; width: min(520px, 100%);
+  max-height: 85vh; overflow: auto;
+}
+.dialog-panel h2 { margin: 0 0 8px; font-size: 21px; letter-spacing: -0.6px; }
+.dialog-panel > p { margin: 0 0 18px; color: var(--muted-foreground); font-size: 14px; }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.dialog-danger { border-left: 5px solid var(--coral); }
+
+/* --- 6. Editors (routines, stories, settings) ----------------------------- */
+.editor-grid { display: grid; gap: 18px; }
+.editor-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 18px; padding: 18px; display: grid; gap: 12px;
+}
+.editor-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-card h3 { margin: 0; font-size: 16px; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.flag-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.flag-item {
+  display: grid; gap: 4px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--muted); font-size: 13px;
+}
+.flag-item[data-severity='block'] { background: #fde8e1; border-color: #f2b9a7; }
+.flag-item[data-severity='warn'] { background: #fdf0d5; border-color: #e8d5a8; }
+.flag-item b { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.flag-item q { color: var(--muted-foreground); font-style: normal; }
+
+.certainty-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border);
+}
+.certainty-tag[data-certainty='fact'] { background: #e6f3e8; color: #2f5b39; }
+.certainty-tag[data-certainty='possibility'] { background: #dff3f8; color: #23525f; }
+.certainty-tag[data-certainty='choice'] { background: #eee9fc; color: #453a7a; }
+
+/* --- 7. Child mode additions --------------------------------------------- */
+.feelings-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.intensity-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.intensity-option {
+  flex: 1 1 140px; min-height: 72px; border-radius: 18px;
+  border: 2px solid var(--border); background: var(--card);
+  font-weight: 800; font-size: 16px; display: grid; place-items: center; gap: 4px;
+}
+.intensity-option[aria-pressed='true'] { border-color: var(--coral); background: #fff1ec; }
+
+.story-reader {
+  display: grid; gap: 18px; max-width: 760px; margin: 0 auto;
+}
+.story-reader-page {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 24px; padding: 28px; font-size: 20px; line-height: 1.7;
+}
+.story-reader-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+.routine-runner-step {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 24px; padding: 26px; display: grid; gap: 14px;
+}
+.routine-progress-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.routine-progress-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 12px; background: var(--muted); font-size: 14px;
+}
+.routine-progress-list li[data-state='done'] { background: #e6f3e8; }
+.routine-progress-list li[data-state='skipped'] { background: var(--muted); color: var(--muted-foreground); }
+.routine-progress-list li[data-state='changed'] { background: #fdf0d5; }
+
+/* --- 8. Responsive corrections -------------------------------------------
+   The design's sidebar collapses below 900px; these rules stop any horizontal
+   scrolling and keep every target reachable at 200% zoom (WCAG 1.4.10). */
+html, body { overflow-x: hidden; }
+.content-wrap, .child-home, .help-screen, .sent-screen { max-width: 100%; }
+.meta-grid, .help-grid, .tool-grid, .hero-grid, .prepare-layout, .preference-grid {
+  min-width: 0;
+}
+.meta-grid > *, .help-grid > *, .tool-grid > * { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .dialog-panel { border-radius: 18px; padding: 20px; }
+  .story-reader-page { padding: 20px; font-size: 18px; }
+  .inbox-actions button, .big-actions button { width: 100%; }
+}
+
+/* Wide content scrolls inside its own container, never the page. */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* --- 9. Status pills always pair an icon and words ------------------------ */
+.status, .status-line, .req-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.status svg, .status-line svg { flex: none; }
+
+/* --- 10. Read-aloud control ----------------------------------------------- */
+.read-aloud-button {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 999px;
+  border: 2px solid var(--border); background: var(--card); font-weight: 700;
+}
+.read-aloud-button[aria-pressed='true'] { border-color: var(--coral); background: #fff1ec; }
+
+/* --- 11. Semantic markup corrections --------------------------------------
+   The design drew several lists as <div>/<span>. They are lists, so the app
+   renders <ol>/<li>; these rules keep the drawn appearance byte-for-byte. */
+ol.journey, ol.lifecycle, ul.offline-steps, ol.onboarding-steps {
+  list-style: none;
+}
+ol.journey { margin: 0 0 24px; }
+ol.lifecycle li {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 99px;
+  background: #f4ece0; color: #6d655b;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.3px;
+}
+ol.lifecycle li.done { background: #ecf4e8; color: #3d6144; }
+ol.lifecycle li.now  { background: #fff0bd; color: #6f4e00; }
+ol.lifecycle li.stop { background: #ffdfd6; color: #8a3219; }
+ol.onboarding-steps { margin: 0; padding: 0; }
+
+.meta-grid dt, .meta-grid dd { margin: 0; }
+.meta-grid > div { min-width: 0; }
+
+/* The design's decorative connector line, drawn without an extra element. */
+.journey::before {
+  content: ''; position: absolute; left: 18%; right: 18%; top: 36px;
+  height: 2px; background: #ede5d8;
+}
+
+/* --- 12. Colour contrast corrections (WCAG 1.4.3) -------------------------
+   The palette inherited from kindly.css does not reach 4.5:1 for normal text.
+   Measured failures and their replacements, all verified with axe-core in a
+   real browser (see docs/accessibility-report.md):
+
+     token / selector        before            after            ratio
+     --muted-foreground      #80786e  4.34:1   #6a6055          6.15:1 on white
+     .eyebrow                #a39a8e  2.77:1   #6a6055          5.82:1 on cream
+     --coral (white text on) #f56a50  2.97:1   #c93f24          4.98:1
+     .text-button            #b36c2b  4.12:1   #95571f          5.74:1
+     text on --primary       #8a691b  2.96:1   #332a06          8.29:1
+
+   These are corrections, not restyling: hue and warmth are preserved, only
+   lightness moves. The coral darkens most, because white text on the original
+   coral cannot reach 4.5:1 at any weight without changing the text colour. */
+:root {
+  --muted-foreground: #6a6055;
+  --coral: #c93f24;
+  --ring: #c93f24;
+}
+
+.eyebrow { color: #6a6055; }
+.text-button { color: #95571f; }
+
+/* The yellow art panel: near-black text is the only thing that clears 4.5:1
+   against --primary without changing the panel colour itself. */
+.auth-art, .auth-art p, .auth-art h2 { color: #332a06; }
+.auth-art .eyebrow { color: #332a06; }
+
+/* Small print inside cards sits on white as often as on cream. */
+.profile-mini small, .routine-row small, .story-row small,
+.routine-large small, .settings-row small, .meta-grid div span {
+  color: #6a6055;
+}
+
+/* Text sitting on a tinted card surface, rather than on white or cream.
+   Each value is the measured minimum that clears 4.5:1 against that specific
+   tint, keeping the tint itself untouched.
+
+     surface                text        before          after      ratio
+     .welcome-card #fbbb18  eyebrow/p   #6a6055 3.57    #332a06    8.29
+     .yellow-card  #ffca26  small       #6e6963 3.55    #4a4133    6.55
+     .coral-card   #ffd9ca  small       #6e6963 4.15    #5a5148    5.93
+     .nav-item.active #fff0d0 label     #9d6e00 3.99    #755200    6.29
+     .date-label   cream                #a39a8e 2.62    #6a6055    5.82
+     .skip-button  cream                #8d8378 3.52    #6a6055    5.82 */
+.welcome-card, .welcome-card p, .welcome-card h2, .welcome-card .eyebrow { color: #332a06; }
+.yellow-card small, .yellow-card b { color: #4a4133; }
+.coral-card small, .coral-card b,
+.blue-card small, .blue-card b,
+.lavender-card small, .lavender-card b,
+.mint-card small, .mint-card b { color: #5a5148; }
+.nav-item.active, .nav-item.active span { color: #755200; }
+.date-label, .skip-button { color: #6a6055; }
+
+/* The child-mode request cards use the same tints again. */
+.help-card small, .help-card b { color: #5a5148; }
+.help-card.yellow small, .help-card.yellow b { color: #4a4133; }
+.back-link { color: #6a6055; }
+
+/* --- 13. Demonstration notice --------------------------------------------
+   Only rendered in the single-file demo build. It sits above everything and
+   does not scroll away, because a build that cannot deliver a request must not
+   let anyone believe it can. */
+.demo-notice {
+  position: sticky; top: 0; z-index: 80;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 18px;
+  background: #3a2f14; color: #fff6e2;
+  font-size: 13.5px; line-height: 1.45;
+  border-bottom: 3px solid var(--primary);
+}
+.demo-notice p { margin: 0; flex: 1 1 22ch; min-width: 0; }
+.demo-notice b { color: #ffd772; }
+.demo-notice svg { flex: none; color: var(--primary); }
+.demo-notice-toggle {
+  flex: none; min-height: 44px; padding: 6px 14px;
+  border: 2px solid #7d6a3d; border-radius: 999px;
+  background: transparent; color: #fff6e2; font-weight: 700; font-size: 12.5px;
+}
+.demo-notice-toggle:hover { background: #4a3c1c; }
+.demo-notice-toggle:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.demo-notice-detail { flex: 1 1 100%; display: grid; gap: 8px; padding: 6px 0 4px; }
+.demo-notice-detail p { color: #f0e4cb; font-size: 13px; max-width: 78ch; }
+
+/* --- 14. Form controls, everywhere ----------------------------------------
+   The design stylesheet only styles inputs inside .onboarding-form,
+   .form-panel and .prepare-form. Every other form in the product — auth,
+   settings, the story and routine editors, dialogs — was falling back to
+   browser defaults: square corners, 2px inset borders and a 21px height, which
+   is what made field sizes look irregular from screen to screen.
+
+   These are the design's own values, lifted from `.onboarding-form input` and
+   applied to the controls it never covered. Checkboxes, radios and ranges are
+   excluded: they have their own native appearance worth keeping. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+textarea,
+select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  outline: none;
+}
+
+textarea { min-height: 96px; resize: vertical; }
+
+select {
+  /* Native arrow, but the box matches every other field. */
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+                    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position: calc(100% - 20px) calc(50% + 2px), calc(100% - 15px) calc(50% + 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='range']):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px rgba(201, 63, 36, 0.14);
+}
+
+input[aria-invalid='true'], textarea[aria-invalid='true'] {
+  border-color: #c0563a;
+  box-shadow: 0 0 0 3px rgba(201, 63, 36, 0.12);
+}
+
+input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: 1; }
+
+input:disabled, textarea:disabled, select:disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+/* A range input keeps its native track but needs room to be a 44px target. */
+input[type='range'] { width: 100%; max-width: 430px; height: 44px; }
+
+/* Links rendered as router <Link>s rather than <button>s still need to look
+   like the design's own text controls. */
+a.auth-switch, a.text-button, a.button { text-decoration: none; }
+a.auth-switch:hover, a.text-button:hover { text-decoration: underline; }

@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+.env
+.env.local
+.env.*.local
+src/lib/database.types.ts
+supabase/.branches
+supabase/.temp
+
+.vercel
