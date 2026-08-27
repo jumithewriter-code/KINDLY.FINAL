@@ -73,6 +73,49 @@ In **Authentication → URL Configuration**:
 
 In **Authentication → Providers → Email**: confirm "Confirm email" is on.
 
+### 2b. Custom SMTP — required, not optional
+
+Supabase's built-in email sender is a **testing** service. It is capped at
+roughly **2 messages per hour for the whole project**, and on many projects it
+refuses to deliver to any address outside your Supabase organisation. Over that
+cap it fails silently at the provider, so the symptom is not an error — it is a
+caregiver who never receives their invitation.
+
+KINDLY sends mail on paths that matter: account verification, password reset,
+and caregiver invitations. A family whose second caregiver never gets their
+invitation is a family where a child's request reaches one adult instead of two.
+Treat SMTP as part of the safety configuration, not as polish.
+
+**You need a domain you control.** `*.vercel.app` cannot be used — it is on the
+Public Suffix List, so you cannot add the DKIM and SPF records a sender needs,
+and mail "from" it will be rejected or spam-filed. Any registrar is fine.
+
+1. Create an account with a transactional email provider — Resend, Postmark,
+   SendGrid and Brevo all have free tiers well above what a small deployment
+   needs. Postmark has the best deliverability for transactional-only sending;
+   Resend is the quickest to set up.
+2. Add your domain in the provider and publish the DNS records it gives you —
+   DKIM, SPF, and a DMARC record. Wait for the provider to report the domain
+   verified. Skipping DMARC is the usual reason mail lands in spam.
+3. Collect the SMTP credentials. For Resend these are host `smtp.resend.com`,
+   port `465`, username `resend`, password = your API key.
+4. In **Authentication → Emails → SMTP Settings**, enable custom SMTP and enter
+   the host, port, username and password, plus a sender address on your verified
+   domain and a sender name. Use a real, monitored address — people reply to
+   these, and a reply from a caregiver that reaches nobody is its own failure.
+5. In **Authentication → Rate Limits**, raise "Rate limit for sending emails".
+   The built-in cap no longer applies once custom SMTP is configured, but the
+   setting does not raise itself.
+6. In **Authentication → Email Templates**, rewrite the defaults. They arrive in
+   Supabase's voice, mention Supabase by name, and read like developer tooling.
+   A caregiver being invited to a child's space should recognise what they are
+   being asked to join, and a child-safety product should not look like a
+   misdirected technical email.
+
+Verify by requesting a password reset for an address that is **not** a member of
+your Supabase organisation. That is the case the built-in sender silently
+refuses, so it is the one that proves the change took effect.
+
 ## 3. Build with real credentials
 
 ```bash
