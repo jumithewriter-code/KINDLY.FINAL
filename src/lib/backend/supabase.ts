@@ -322,8 +322,15 @@ export class SupabaseBackend implements KindlyBackend {
   }
 
   async sendPasswordReset(email: string): Promise<void> {
-    // Never surfaces whether the address exists.
-    await this.client.auth.resetPasswordForEmail(email, { redirectTo: `${env().siteUrl}/auth/reset` });
+    // Supabase answers 200 for an address it does not know, so surfacing the
+    // error here still never reveals whether an account exists. What it does
+    // reveal is that nothing was sent at all — a rate limit or an SMTP failure
+    // — which the caller previously swallowed, leaving people staring at an
+    // inbox that was never going to receive anything.
+    const { error } = await this.client.auth.resetPasswordForEmail(
+      email, { redirectTo: `${env().siteUrl}/auth/reset` },
+    );
+    if (error) throw translate(error, 'That reset email could not be sent. Please try again in a few minutes.');
   }
 
   async updatePassword(newPassword: string): Promise<void> {
@@ -332,7 +339,10 @@ export class SupabaseBackend implements KindlyBackend {
   }
 
   async resendVerificationEmail(email: string): Promise<void> {
-    await this.client.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${env().siteUrl}/auth/callback` } });
+    const { error } = await this.client.auth.resend({
+      type: 'signup', email, options: { emailRedirectTo: `${env().siteUrl}/auth/callback` },
+    });
+    if (error) throw translate(error, 'That email could not be sent again. Please try again in a few minutes.');
   }
 
   // -- workspace ------------------------------------------------------------
