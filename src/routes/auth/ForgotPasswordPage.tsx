@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
-import { Button, TextInput } from '../../components/ui';
+import { Button, ErrorState, TextInput } from '../../components/ui';
 import { useAnnouncer, useBackend } from '../../state/providers';
 import { forgotPasswordSchema, parseOrFieldErrors, type FieldErrors } from '../../lib/schemas';
 
@@ -12,6 +12,7 @@ export function ForgotPasswordPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -22,10 +23,16 @@ export function ForgotPasswordPage() {
       return;
     }
     setBusy(true);
+    setFailure(null);
     try {
       await backend.sendPasswordReset(parsed.data.email);
       setSent(true);
       announce('If that address has an account, a reset link is on its way.');
+    } catch (e) {
+      // Not "no such account" — Supabase stays silent about that. This is the
+      // mail itself failing, and saying so beats a false reassurance.
+      setFailure(e);
+      announce('That reset email could not be sent.', 'assertive');
     } finally {
       setBusy(false);
     }
@@ -58,6 +65,8 @@ export function ForgotPasswordPage() {
               <h1>Forgotten your password?</h1>
               <p>Enter the email address you use for Kindly and we will send a reset link.</p>
             </div>
+            {failure ? <ErrorState error={failure} onRetry={() => setFailure(null)} /> : null}
+
             <form onSubmit={onSubmit} noValidate>
               <TextInput
                 label="Email address"
