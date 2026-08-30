@@ -433,3 +433,151 @@ input[type='range'] { width: 100%; max-width: 430px; height: 44px; }
    like the design's own text controls. */
 a.auth-switch, a.text-button, a.button { text-decoration: none; }
 a.auth-switch:hover, a.text-button:hover { text-decoration: underline; }
+
+/* ============================================================================
+   15. Operator dashboard
+   ----------------------------------------------------------------------------
+   Built from the same tokens as the rest of KINDLY, so the operator view reads
+   as part of the product rather than as a bolted-on admin panel.
+
+   Two rules from the charting guidance are load-bearing here:
+     - a single series needs no legend, so there is none;
+     - state is never colour alone. Every toned tile carries an icon and a
+       sentence, so the meaning survives greyscale, forced colours and colour
+       blindness.
+   ========================================================================= */
+
+.admin-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin: 4px 0 26px;
+}
+.admin-timestamp {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  color: var(--muted-foreground); font-size: 12px;
+}
+
+.admin-section { margin-bottom: 34px; }
+.admin-section-title { margin: 0 0 4px; font-size: 17px; letter-spacing: -0.4px; }
+.admin-section-note { margin: 0 0 14px; color: var(--muted-foreground); font-size: 12.5px; }
+
+.admin-tiles {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.admin-tile {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 17px 18px;
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 16px;
+}
+.admin-tile-label {
+  color: var(--muted-foreground); font-size: 10.5px;
+  font-weight: 800; letter-spacing: 1.1px; text-transform: uppercase;
+}
+.admin-tile-value {
+  font-size: 30px; letter-spacing: -1.2px; line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.admin-tile-detail {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--muted-foreground); font-size: 12px;
+}
+/* The status hues are reserved for state and are never reused as series colours. */
+.admin-tile.tone-good     { border-left-color: #3f7d4e; }
+.admin-tile.tone-warning  { border-left-color: #a5701a; }
+.admin-tile.tone-critical { border-left-color: var(--coral); background: #fff6f3; }
+.admin-tile.tone-good .admin-tile-detail     { color: #3f7d4e; }
+.admin-tile.tone-warning .admin-tile-detail  { color: #8a5c10; }
+.admin-tile.tone-critical .admin-tile-detail { color: var(--coral); font-weight: 700; }
+
+.admin-card {
+  padding: 20px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 18px;
+}
+.admin-empty { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.6; }
+
+/* -- the 14-day chart ---------------------------------------------------- */
+.admin-chart {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  gap: 6px; height: 150px; align-items: end;
+}
+.admin-bar-slot { display: grid; grid-template-rows: 1fr auto; gap: 7px; height: 100%; min-width: 0; }
+.admin-bar-track { position: relative; display: flex; align-items: flex-end; height: 100%; }
+.admin-bar {
+  position: relative; width: 100%;
+  background: var(--primary);
+  /* KINDLY's amber sits at roughly 1.7:1 against the white card — enough to see
+     as a shape, not enough to rely on. The outline gives the bar a legible edge,
+     and the table view below carries the numbers for anyone the fill fails. */
+  outline: 1px solid #c08c05;
+  outline-offset: -1px;
+  /* Rounded data-end only; the baseline stays square so the bar sits on it. */
+  border-radius: 4px 4px 0 0;
+  min-height: 3px;
+}
+.admin-bar.zero {
+  height: 2px !important; min-height: 2px;
+  background: var(--border); border-radius: 2px;
+}
+.admin-bar-tip {
+  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+  z-index: 4; padding: 6px 9px; white-space: nowrap;
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: var(--shadow); font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0; pointer-events: none; transition: opacity .15s ease;
+}
+/* The hit target is the whole column, not the drawn bar. */
+.admin-bar-slot:hover .admin-bar-tip, .admin-bar-slot:focus-within .admin-bar-tip { opacity: 1; }
+.admin-bar-label {
+  text-align: center; color: var(--muted-foreground);
+  font-size: 10px; font-weight: 700;
+}
+
+.admin-table-toggle { margin-top: 16px; font-size: 12px; }
+.admin-table-toggle summary { color: var(--muted-foreground); font-weight: 700; cursor: pointer; }
+.admin-table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 12.5px; }
+.admin-table th, .admin-table td {
+  padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border);
+}
+.admin-table td { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-table thead th { color: var(--muted-foreground); font-size: 11px; }
+.admin-table thead th:last-child { text-align: right; }
+
+/* -- ratios -------------------------------------------------------------- */
+.admin-ratios { display: grid; gap: 14px; }
+.admin-ratio {
+  padding: 16px 18px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 16px;
+}
+.admin-ratio-head {
+  display: flex; justify-content: space-between; gap: 14px;
+  margin-bottom: 9px; font-size: 13px;
+}
+.admin-ratio-head b { font-variant-numeric: tabular-nums; }
+.admin-ratio-track { height: 8px; background: var(--muted); border-radius: 99px; overflow: hidden; }
+.admin-ratio-fill { height: 100%; background: var(--primary); border-radius: 99px; }
+.admin-ratio-fill.complete { background: #3f7d4e; }
+
+/* -- lists --------------------------------------------------------------- */
+.admin-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.admin-list li {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: 11px; font-size: 13px;
+}
+.admin-list li > span:not(.admin-type-bar) { flex: 1; text-transform: capitalize; }
+.admin-list li > b { font-variant-numeric: tabular-nums; }
+.admin-list li.is-critical { background: #fff6f3; color: var(--coral); font-weight: 700; }
+.admin-type-bar {
+  position: absolute; left: 0; top: 0; bottom: 0; z-index: 0;
+  background: var(--peach); border-radius: 11px;
+}
+.admin-list li > span:not(.admin-type-bar), .admin-list li > b { position: relative; z-index: 1; }
+
+@media (max-width: 560px) {
+  .admin-tile-value { font-size: 25px; }
+  .admin-chart { height: 116px; gap: 3px; }
+  .admin-bar-label { font-size: 9px; }
+}

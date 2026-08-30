@@ -52,7 +52,8 @@ If the CLI cannot authenticate on your machine, paste
 migrations concatenated in order. A project that already has the schema from an
 earlier run needs only the patch files, in order:
 `supabase/patch-01-child-send-request.sql`, then
-`supabase/patch-02-mandatory-adult-code.sql`.
+`supabase/patch-02-mandatory-adult-code.sql`, then
+`supabase/patch-03-operator-dashboard.sql`.
 
 Verify RLS landed before going further:
 
@@ -115,6 +116,24 @@ and mail "from" it will be rejected or spam-filed. Any registrar is fine.
 Verify by requesting a password reset for an address that is **not** a member of
 your Supabase organisation. That is the case the built-in sender silently
 refuses, so it is the one that proves the change took effect.
+
+### 2c. Make yourself an operator
+
+The operator dashboard at `/app/admin` shows counts and timings across every
+family — how many children asked for help, how many were answered, how long it
+took, and how many ran out of adults and were shown offline help. It shows no
+name, no message, and no identifier that could be joined back to a family.
+
+Nobody is an operator until you say so, and the only way to say so is by hand:
+
+```sql
+insert into kindly.operators (user_id, note)
+select id, 'me' from auth.users where email = 'you@example.com';
+```
+
+`kindly.operators` has RLS forced and no policy at all. No application code can
+read it, discover who is on it, or write to it, so a caregiver cannot promote
+themselves. To remove someone, delete their row.
 
 ## 3. Build with real credentials
 

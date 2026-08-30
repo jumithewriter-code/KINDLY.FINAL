@@ -24,6 +24,7 @@ import { RoutinesPage } from './routes/app/RoutinesPage';
 import { RoutineEditorPage } from './routes/app/RoutineEditorPage';
 import { ProfilePage } from './routes/app/ProfilePage';
 import { SettingsPage } from './routes/app/SettingsPage';
+import { AdminPage } from './routes/app/AdminPage';
 import { CaregiversSettingsPage } from './routes/app/settings/CaregiversSettingsPage';
 import { ChildrenSettingsPage } from './routes/app/settings/ChildrenSettingsPage';
 import { PreferencesSettingsPage } from './routes/app/settings/PreferencesSettingsPage';
@@ -107,6 +108,7 @@ export function AppRoutes() {
         <Route path="settings/safety" element={<SafetySettingsPage />} />
         <Route path="settings/notifications" element={<NotificationsSettingsPage />} />
         <Route path="settings/data" element={<DataSettingsPage />} />
+        <Route path="admin" element={<AdminPage />} />
       </Route>
 
       <Route path="/child" element={<RequireAuth><ChildShell /></RequireAuth>}>
