@@ -1277,6 +1277,8 @@ interface OperatorMetricsRow {
   failures_7d: Record<string, number>;
   daily_requests: { day: string; n: number }[];
   safety: { families_with_code: number; children_with_safe_adult: number; children_with_offline_help_step: number };
+  funnel_30d: { accounts_created: number; verified_email: number; started_onboarding: number; finished_onboarding: number; joined_a_family: number; family_sent_request: number };
+  active: { seen_24h: number; seen_7d: number; accounts_total: number };
   content: { stories_total: number; stories_approved: number; stories_draft: number; routines_total: number };
   requests_by_type_7d: Record<string, number> | null;
   type_breakdown_threshold: number;
@@ -1308,6 +1310,18 @@ function mapOperatorMetrics(r: OperatorMetricsRow): OperatorMetrics {
       familiesWithCode: r.safety.families_with_code,
       childrenWithSafeAdult: r.safety.children_with_safe_adult,
       childrenWithOfflineHelpStep: r.safety.children_with_offline_help_step,
+    },
+    funnel30d: {
+      accountsCreated: r.funnel_30d.accounts_created,
+      verifiedEmail: r.funnel_30d.verified_email,
+      startedOnboarding: r.funnel_30d.started_onboarding,
+      finishedOnboarding: r.funnel_30d.finished_onboarding,
+      joinedAFamily: r.funnel_30d.joined_a_family,
+      familySentRequest: r.funnel_30d.family_sent_request,
+    },
+    active: {
+      seen24h: r.active.seen_24h, seen7d: r.active.seen_7d,
+      accountsTotal: r.active.accounts_total,
     },
     content: {
       storiesTotal: r.content.stories_total, storiesApproved: r.content.stories_approved,

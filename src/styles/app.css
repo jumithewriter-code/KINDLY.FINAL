@@ -581,3 +581,18 @@ a.auth-switch:hover, a.text-button:hover { text-decoration: underline; }
   .admin-chart { height: 116px; gap: 3px; }
   .admin-bar-label { font-size: 9px; }
 }
+
+/* -- signup funnel ------------------------------------------------------- */
+/* Every bar is measured against the top of the funnel, not against the step
+   above it, so the narrowing you see is the real narrowing. */
+.admin-funnel { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.admin-funnel li { display: grid; gap: 6px; }
+.admin-funnel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.admin-funnel-head b { font-variant-numeric: tabular-nums; }
+.admin-funnel-head small { margin-left: 6px; color: var(--muted-foreground); font-weight: 600; white-space: nowrap; }
+.admin-funnel-track { height: 10px; background: var(--muted); border-radius: 99px; overflow: hidden; }
+.admin-funnel-fill {
+  height: 100%; background: var(--primary); border-radius: 99px;
+  outline: 1px solid #c08c05; outline-offset: -1px;
+}
+.admin-funnel-drop { color: var(--muted-foreground); font-size: 11.5px; }

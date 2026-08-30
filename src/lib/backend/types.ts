@@ -81,6 +81,16 @@ export interface OperatorMetrics {
     childrenWithSafeAdult: number;
     childrenWithOfflineHelpStep: number;
   };
+  /** Accounts created in the last 30 days, each step a subset of the one above. */
+  funnel30d: {
+    accountsCreated: number;
+    verifiedEmail: number;
+    startedOnboarding: number;
+    finishedOnboarding: number;
+    joinedAFamily: number;
+    familySentRequest: number;
+  };
+  active: { seen24h: number; seen7d: number; accountsTotal: number };
   content: {
     storiesTotal: number;
     storiesApproved: number;
