@@ -40,6 +40,58 @@ export interface Workspace {
   pendingInvitations: { id: string; familyName: string; role: string; invitedEmail: string }[];
 }
 
+/**
+ * What an operator is allowed to see.
+ *
+ * Counts and durations only. There is no name, no message text and no family
+ * or child identifier anywhere in this shape, and that is enforced in SQL by
+ * `public.operator_metrics()` rather than here — the server decides what an
+ * operator may know, not the client that renders it.
+ */
+export interface OperatorMetrics {
+  generatedAt: string;
+  reach: {
+    families: number;
+    children: number;
+    caregivers: number;
+    trusted: number;
+    familiesAdded7d: number;
+  };
+  requests: {
+    total: number;
+    last24h: number;
+    last7d: number;
+    urgent7d: number;
+    answered7d: number;
+    resolved7d: number;
+    cancelled7d: number;
+  };
+  waiting: {
+    escalated7d: number;
+    unavailable7d: number;
+    failed7d: number;
+    openNow: number;
+    medianAnswerSeconds: number | null;
+    p90AnswerSeconds: number | null;
+  };
+  failures7d: Record<string, number>;
+  dailyRequests: { day: string; n: number }[];
+  safety: {
+    familiesWithCode: number;
+    childrenWithSafeAdult: number;
+    childrenWithOfflineHelpStep: number;
+  };
+  content: {
+    storiesTotal: number;
+    storiesApproved: number;
+    storiesDraft: number;
+    routinesTotal: number;
+  };
+  /** Null while there are too few families for a breakdown to be anonymous. */
+  requestsByType7d: Record<string, number> | null;
+  typeBreakdownThreshold: number;
+}
+
 export interface SignUpResult {
   needsEmailVerification: boolean;
   user: AuthUser | null;
@@ -218,6 +270,12 @@ export interface KindlyBackend {
   uploadMedia(input: { familyId: string; childId?: string | null; kind: MediaAsset['kind']; file: File; altText: string; caption?: string | null }): Promise<MediaAsset>;
   getSignedMediaUrl(mediaId: string): Promise<string>;
   deleteMedia(mediaId: string): Promise<void>;
+
+  // -- operator ------------------------------------------------------------
+  /** True only for accounts listed in `kindly.operators`, which no client can write to. */
+  amIOperator(): Promise<boolean>;
+  /** Aggregates across every family. Throws NOT_PERMITTED for anyone else. */
+  getOperatorMetrics(): Promise<OperatorMetrics>;
 
   // -- data rights ---------------------------------------------------------
   exportFamilyData(familyId: string): Promise<unknown>;

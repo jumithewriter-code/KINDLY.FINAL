@@ -741,7 +741,6 @@ describe('export and deletion', () => {
 });
 
 describe('the grown-up code is mandatory', () => {
-  beforeEach(seedFamily);
 
   it('refuses to create a family space without a code', async () => {
     const fresh = new MemoryBackend();
@@ -786,5 +785,75 @@ describe('the grown-up code is mandatory', () => {
     await expect(rosa.setAdultVerificationMode(familyId, 'none' as 'pin'))
       .rejects.toMatchObject({ code: 'INVALID_VERIFICATION_MODE' });
     await expect(rosa.setAdultVerificationMode(familyId, 'device_biometric')).resolves.toBeUndefined();
+  });
+});
+
+describe('the operator dashboard', () => {
+
+  it('refuses metrics to an ordinary caregiver', async () => {
+    await expect(rosa.getOperatorMetrics()).rejects.toMatchObject({ code: 'NOT_PERMITTED' });
+    expect(await rosa.amIOperator()).toBe(false);
+  });
+
+  it('refuses metrics to a caregiver from another family', async () => {
+    await expect(outsider.getOperatorMetrics()).rejects.toMatchObject({ code: 'NOT_PERMITTED' });
+  });
+
+  it('has no client path to becoming an operator', () => {
+    // The only grant is grantOperatorForTests, standing in for a hand-written
+    // row in kindly.operators. Nothing on the KindlyBackend interface can add
+    // one, which is what stops a caregiver promoting themselves.
+    const surface = Object.getOwnPropertyNames(Object.getPrototypeOf(rosa));
+    expect(surface.filter((k) => /grant|promote|addOperator/i.test(k)))
+      .toEqual(['grantOperatorForTests']);
+  });
+
+  it('returns aggregates once granted, and never a name or a message', async () => {
+    const me = (await rosa.getCurrentUser())!;
+    rosa.grantOperatorForTests(me.id);
+
+    expect(await rosa.amIOperator()).toBe(true);
+    const m = await rosa.getOperatorMetrics();
+
+    expect(m.reach.families).toBeGreaterThanOrEqual(2);
+    expect(m.reach.children).toBeGreaterThanOrEqual(2);
+    expect(m.dailyRequests).toHaveLength(14);
+
+    // The privacy property, asserted rather than assumed: none of the names or
+    // free text this suite seeded may appear anywhere in the payload.
+    const json = JSON.stringify(m);
+    for (const secret of ['Rosa', 'Léo', 'Marcus', 'Grandma Ade', 'Sam', 'Ana', 'quiet corner', 'O’Neill']) {
+      expect(json).not.toContain(secret);
+    }
+    // Nor any identifier that could be joined back to a family.
+    expect(json).not.toContain(familyId);
+    expect(json).not.toContain(leoId);
+  });
+
+  it('withholds the request-type breakdown while too few families exist', async () => {
+    const me = (await rosa.getCurrentUser())!;
+    rosa.grantOperatorForTests(me.id);
+    const m = await rosa.getOperatorMetrics();
+
+    // Two families in this suite, threshold is five.
+    expect(m.reach.families).toBeLessThan(m.typeBreakdownThreshold);
+    expect(m.requestsByType7d).toBeNull();
+  });
+
+  it('counts a request through its whole life', async () => {
+    const me = (await rosa.getCurrentUser())!;
+    rosa.grantOperatorForTests(me.id);
+
+    const before = await rosa.getOperatorMetrics();
+
+    const token = await startChildSession();
+    const draft = await childDevice.childCreateRequest(token, { typeSlug: 'drink', dedupeKey: 'dedupe-operator' });
+    await childDevice.childSendRequest(token, draft.id);
+    await rosa.respondToRequest({ requestId: draft.id, kind: 'coming_now', urgency: 'can_wait' });
+
+    const after = await rosa.getOperatorMetrics();
+    expect(after.requests.last7d).toBe(before.requests.last7d + 1);
+    expect(after.requests.answered7d).toBe(before.requests.answered7d + 1);
+    expect(after.waiting.medianAnswerSeconds).not.toBeNull();
   });
 });

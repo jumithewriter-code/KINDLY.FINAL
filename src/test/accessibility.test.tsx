@@ -331,3 +331,54 @@ describe('empty, loading and error states', () => {
     expect(await screen.findByRole('heading', { name: /that page does not exist/i })).toBeInTheDocument();
   });
 });
+
+describe('the operator dashboard', () => {
+  it('has no detectable accessibility violations', async () => {
+    const { backend } = await seedHarness();
+    backend.grantOperatorForTests((await backend.getCurrentUser())!.id);
+
+    const { container } = renderApp(backend, '/app/admin');
+    await screen.findByRole('heading', { name: /how kindly is doing/i });
+    expect(await axe(container, AXE_RULES)).toHaveNoViolations();
+  });
+
+  it('describes the chart to a screen reader and offers the same numbers as a table', async () => {
+    const { backend, childId } = await seedHarness();
+    backend.grantOperatorForTests((await backend.getCurrentUser())!.id);
+
+    // The chart only exists once there is something to draw, so put one request
+    // through. An empty fortnight renders the empty state instead, which is a
+    // different assertion.
+    const { sessionToken } = await backend.startChildSession(childId, 'Tablet');
+    const draft = await backend.childCreateRequest(sessionToken, { typeSlug: 'drink', dedupeKey: 'a11y-admin' });
+    await backend.childSendRequest(sessionToken, draft.id);
+
+    renderApp(backend, '/app/admin');
+    await screen.findByRole('heading', { name: /how kindly is doing/i });
+
+    // The bars are decorative on their own; the figure carries the summary.
+    const chart = await screen.findByRole('img', { name: /requests per day over 14 days/i });
+    expect(chart).toBeInTheDocument();
+
+    // And the numbers exist as text, not only as bar heights.
+    expect(screen.getByText(/show these numbers as a table/i)).toBeInTheDocument();
+  });
+
+  it('is not reachable by a caregiver who is not an operator', async () => {
+    const { backend } = await seedHarness();
+    renderApp(backend, '/app/admin');
+
+    // The server refuses; the page says so rather than rendering empty panels.
+    await waitFor(() => {
+      expect(screen.getByText(/this page is for kindly operators/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('heading', { name: /how kindly is doing/i })).not.toBeInTheDocument();
+  });
+
+  it('does not show the operator link to an ordinary caregiver', async () => {
+    const { backend } = await seedHarness();
+    renderApp(backend, '/app');
+    await screen.findByRole('navigation', { name: /main navigation/i });
+    expect(screen.queryByRole('link', { name: /operator/i })).not.toBeInTheDocument();
+  });
+});

@@ -20,7 +20,7 @@ import {
   type StoryVersion, type TrustedCaregiver, type Urgency,
 } from '../types';
 import type { ResponseKind } from '../requests/stateMachine';
-import type { KindlyBackend, RoutineInput, SignUpResult, StoryDraftInput, Unsubscribe, Workspace } from './types';
+import type { KindlyBackend, OperatorMetrics, RoutineInput, SignUpResult, StoryDraftInput, Unsubscribe, Workspace } from './types';
 
 // ---------------------------------------------------------------------------
 // Error translation: Postgres codes and our own RAISE messages become typed,
@@ -1227,6 +1227,26 @@ export class SupabaseBackend implements KindlyBackend {
     await this.client.from('media_assets').update({ deleted_at: new Date().toISOString() }).eq('id', mediaId);
   }
 
+  // -- operator -------------------------------------------------------------
+
+  async amIOperator(): Promise<boolean> {
+    // A failure here must read as "not an operator", never as an error the app
+    // has to handle: this only decides whether one nav link is drawn.
+    try {
+      const { data } = await this.client.rpc('am_i_operator');
+      return data === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getOperatorMetrics(): Promise<OperatorMetrics> {
+    const raw = await this.rpc<Record<string, never>>(
+      'operator_metrics', {}, 'Those metrics could not be loaded.',
+    ) as unknown as OperatorMetricsRow;
+    return mapOperatorMetrics(raw);
+  }
+
   // -- data rights ----------------------------------------------------------
 
   async exportFamilyData(familyId: string): Promise<unknown> {
@@ -1240,4 +1260,60 @@ export class SupabaseBackend implements KindlyBackend {
     if (scope === 'account') await this.signOut();
     return id;
   }
+}
+
+/**
+ * The wire shape of `public.operator_metrics()`.
+ *
+ * Written out rather than inferred so that a change in SQL that drops a field
+ * fails the build here, instead of rendering as a silent zero on a dashboard
+ * someone is using to decide whether children are being answered.
+ */
+interface OperatorMetricsRow {
+  generated_at: string;
+  reach: { families: number; children: number; caregivers: number; trusted: number; families_added_7d: number };
+  requests: { total: number; last_24h: number; last_7d: number; urgent_7d: number; answered_7d: number; resolved_7d: number; cancelled_7d: number };
+  waiting: { escalated_7d: number; unavailable_7d: number; failed_7d: number; open_now: number; median_answer_seconds: number | null; p90_answer_seconds: number | null };
+  failures_7d: Record<string, number>;
+  daily_requests: { day: string; n: number }[];
+  safety: { families_with_code: number; children_with_safe_adult: number; children_with_offline_help_step: number };
+  content: { stories_total: number; stories_approved: number; stories_draft: number; routines_total: number };
+  requests_by_type_7d: Record<string, number> | null;
+  type_breakdown_threshold: number;
+}
+
+function mapOperatorMetrics(r: OperatorMetricsRow): OperatorMetrics {
+  const num = (v: number | null | undefined) => (v == null ? null : Number(v));
+  return {
+    generatedAt: r.generated_at,
+    reach: {
+      families: r.reach.families, children: r.reach.children,
+      caregivers: r.reach.caregivers, trusted: r.reach.trusted,
+      familiesAdded7d: r.reach.families_added_7d,
+    },
+    requests: {
+      total: r.requests.total, last24h: r.requests.last_24h, last7d: r.requests.last_7d,
+      urgent7d: r.requests.urgent_7d, answered7d: r.requests.answered_7d,
+      resolved7d: r.requests.resolved_7d, cancelled7d: r.requests.cancelled_7d,
+    },
+    waiting: {
+      escalated7d: r.waiting.escalated_7d, unavailable7d: r.waiting.unavailable_7d,
+      failed7d: r.waiting.failed_7d, openNow: r.waiting.open_now,
+      medianAnswerSeconds: num(r.waiting.median_answer_seconds),
+      p90AnswerSeconds: num(r.waiting.p90_answer_seconds),
+    },
+    failures7d: r.failures_7d ?? {},
+    dailyRequests: r.daily_requests ?? [],
+    safety: {
+      familiesWithCode: r.safety.families_with_code,
+      childrenWithSafeAdult: r.safety.children_with_safe_adult,
+      childrenWithOfflineHelpStep: r.safety.children_with_offline_help_step,
+    },
+    content: {
+      storiesTotal: r.content.stories_total, storiesApproved: r.content.stories_approved,
+      storiesDraft: r.content.stories_draft, routinesTotal: r.content.routines_total,
+    },
+    requestsByType7d: r.requests_by_type_7d,
+    typeBreakdownThreshold: r.type_breakdown_threshold,
+  };
 }

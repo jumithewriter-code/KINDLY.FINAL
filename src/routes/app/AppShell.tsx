@@ -9,6 +9,7 @@ import {
 import { caregiverLabel, childLabel, initialFrom, possessive } from '../../lib/names';
 import { formatDate, formatTime } from '../../lib/format';
 import { STATUS_META, isLive } from '../../lib/requests/stateMachine';
+import { useIsOperator } from '../../state/useIsOperator';
 
 const NAV = [
   { to: '/app', label: 'Home', icon: 'i-home', end: true },
@@ -28,6 +29,7 @@ const TITLES: Record<string, string> = {
 };
 
 export function AppShell() {
+  const isOperator = useIsOperator();
   const backend = useBackend();
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -169,6 +171,12 @@ export function AppShell() {
         </nav>
 
         <div className="sidebar-bottom">
+          {isOperator ? (
+            <NavLink to="/app/admin" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
+              <Icon name="i-shield" size={19} />
+              <span>Operator</span>
+            </NavLink>
+          ) : null}
           <NavLink to="/app/settings" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
             <Icon name="i-settings-2" size={19} />
             <span>Settings</span>

@@ -18,6 +18,14 @@ export async function getBackend(): Promise<KindlyBackend> {
   if (env().backend === 'memory') {
     const { memoryBackend } = await import('./memory');
     instance = memoryBackend;
+    // The end-to-end build needs a way to reach states a real user cannot set up
+    // through the interface — being a KINDLY operator, for one, which is granted
+    // from outside the app by design. Gated on VITE_KINDLY_E2E, which only the
+    // Playwright build sets, and reachable only alongside the in-memory backend:
+    // a production bundle talks to Supabase and never evaluates this branch.
+    if (env().isE2E && typeof window !== 'undefined') {
+      (window as unknown as { __kindlyMemoryBackend?: unknown }).__kindlyMemoryBackend = memoryBackend;
+    }
     return instance;
   }
 

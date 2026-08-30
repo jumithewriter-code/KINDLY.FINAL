@@ -35,7 +35,7 @@ import {
 import { canTransition, type RequestStatus, type ResponseKind } from '../requests/stateMachine';
 import { normalizeName } from '../names';
 import { reviewStory } from '../stories/safetyReview';
-import type { KindlyBackend, RoutineInput, SignUpResult, StoryDraftInput, Unsubscribe, Workspace } from './types';
+import type { KindlyBackend, OperatorMetrics, RoutineInput, SignUpResult, StoryDraftInput, Unsubscribe, Workspace } from './types';
 
 const DB_KEY = 'kindly:memory-db:v1';
 const SESSION_KEY = 'kindly:memory-session:v1';
@@ -73,7 +73,7 @@ interface DbStoryProgress { storyId: string; childId: string; lastPage: number }
 interface Db {
   users: DbUser[];
   caregivers: (CaregiverProfile & { deletedAt: string | null })[];
-  families: (Family & { createdBy: string; deletedAt: string | null })[];
+  families: (Family & { createdBy: string; createdAt: string; deletedAt: string | null })[];
   members: DbMember[];
   children: (ChildProfile & { deletedAt: string | null })[];
   preferences: ChildPreferences[];
@@ -83,6 +83,7 @@ interface Db {
   escalationRules: EscalationRule[];
   invitations: DbInvitation[];
   pins: DbPin[];
+  operators: string[];
   childSessions: DbChildSession[];
   requestTypes: RequestType[];
   requests: HelpRequest[];
@@ -116,11 +117,14 @@ const BUILTIN_TYPES: RequestType[] = [
   { slug: 'feeling', childFacingLabel: 'How I feel', childFacingDetail: 'I want to share this', urgency: 'can_wait', pictogramKey: 'i-heart', pictogramMediaId: null, colorKey: 'purple', sortOrder: 90 },
 ];
 
+/** Mirrors `k_min_families` in migration 0014. Changing one means changing both. */
+const OPERATOR_TYPE_BREAKDOWN_MIN_FAMILIES = 5;
+
 function emptyDb(): Db {
   return {
     users: [], caregivers: [], families: [], members: [], children: [], preferences: [],
     communicationMethods: [], sensoryPreferences: [], trusted: [], escalationRules: [],
-    invitations: [], pins: [],
+    invitations: [], pins: [], operators: [],
     childSessions: [], requestTypes: [...BUILTIN_TYPES], requests: [], responses: [], events: [],
     routines: [], routineSteps: [], routineRuns: [], stories: [], storyPages: [], storyVersions: [],
     storyAssignments: [], storyProgress: [], storyFeedback: [], notifications: [], media: [],
@@ -506,6 +510,7 @@ export class MemoryBackend implements KindlyBackend {
       id: familyId,
       familyName: clean(input.familyName) || `${caregiverName} + ${childName}`,
       createdBy: user.id,
+      createdAt: nowIso(),
       emergencyInstructions: null,
       emergencyServicesNote: 'KINDLY is not an emergency service. In an emergency call your local emergency number.',
       deletedAt: null,
@@ -1891,6 +1896,121 @@ export class MemoryBackend implements KindlyBackend {
     this.memberOf(m.familyId);
     m.deletedAt = nowIso();
     this.commit();
+  }
+
+  // -- operator -------------------------------------------------------------
+
+  /**
+   * Stands in for inserting a row into `kindly.operators` by hand. There is no
+   * client path to this in either backend — an operator is granted from outside
+   * the application, which is the whole point of the table having no policy.
+   */
+  grantOperatorForTests(userId: string): void {
+    if (!this.db.operators.includes(userId)) this.db.operators.push(userId);
+    this.commit();
+  }
+
+  async amIOperator(): Promise<boolean> {
+    return this.currentUserId != null && this.db.operators.includes(this.currentUserId);
+  }
+
+  async getOperatorMetrics(): Promise<OperatorMetrics> {
+    if (!this.currentUserId) throw new KindlyError('NOT_AUTHENTICATED', 'Please sign in.');
+    if (!this.db.operators.includes(this.currentUserId)) {
+      throw new KindlyError('NOT_PERMITTED', 'You do not have permission to do that.');
+    }
+
+    const now = Date.now();
+    const since = (days: number) => now - days * 86_400_000;
+    const at = (iso: string | null | undefined) => (iso ? Date.parse(iso) : null);
+    const recent = (r: HelpRequest, days: number) => (at(r.createdAt) ?? 0) > since(days);
+
+    const all = this.db.requests;
+    const week = all.filter((r) => recent(r, 7));
+    const count = (list: HelpRequest[], pred: (r: HelpRequest) => boolean) => list.filter(pred).length;
+
+    // Median and p90 over the gap from delivered to acknowledged, in seconds.
+    const answerSeconds = week
+      .filter((r) => r.acknowledgedAt && r.deliveredAt)
+      .map((r) => (at(r.acknowledgedAt)! - at(r.deliveredAt)!) / 1000)
+      .sort((a, b) => a - b);
+    const quantile = (q: number): number | null => {
+      if (!answerSeconds.length) return null;
+      const pos = (answerSeconds.length - 1) * q;
+      const lo = Math.floor(pos);
+      const hi = Math.ceil(pos);
+      const value = lo === hi ? answerSeconds[lo]! : answerSeconds[lo]! + (answerSeconds[hi]! - answerSeconds[lo]!) * (pos - lo);
+      return Math.round(value);
+    };
+
+    const tally = (list: HelpRequest[], key: (r: HelpRequest) => string | null | undefined) => {
+      const out: Record<string, number> = {};
+      for (const r of list) {
+        const k = key(r);
+        if (k) out[k] = (out[k] ?? 0) + 1;
+      }
+      return out;
+    };
+
+    // Fourteen days of counts, oldest first, with empty days present as zero so
+    // a gap reads as a quiet day rather than as missing data.
+    const dailyRequests: { day: string; n: number }[] = [];
+    for (let i = 13; i >= 0; i -= 1) {
+      const day = new Date(now - i * 86_400_000).toISOString().slice(0, 10);
+      dailyRequests.push({ day, n: count(all, (r) => (r.createdAt ?? '').slice(0, 10) === day) });
+    }
+
+    const families = this.db.families.filter((f) => !f.deletedAt).length;
+    const OPEN: HelpRequest['status'][] = ['sending', 'retrying', 'delivered', 'waiting', 'escalated', 'acknowledged'];
+
+    return {
+      generatedAt: nowIso(),
+      reach: {
+        families,
+        children: this.db.children.filter((c) => !c.deletedAt).length,
+        caregivers: new Set(this.db.members.map((m) => m.userId)).size,
+        trusted: this.db.trusted.length,
+        familiesAdded7d: this.db.families.filter((f) => (at(f.createdAt) ?? 0) > since(7)).length,
+      },
+      requests: {
+        total: all.length,
+        last24h: count(all, (r) => recent(r, 1)),
+        last7d: week.length,
+        urgent7d: count(week, (r) => r.urgency === 'urgent'),
+        answered7d: count(week, (r) => Boolean(r.acknowledgedAt)),
+        resolved7d: count(week, (r) => Boolean(r.resolvedAt)),
+        cancelled7d: count(week, (r) => Boolean(r.cancelledAt)),
+      },
+      waiting: {
+        escalated7d: count(week, (r) => Boolean(r.escalatedAt)),
+        unavailable7d: count(week, (r) => Boolean(r.unavailableAt)),
+        failed7d: count(week, (r) => r.status === 'failed'),
+        openNow: count(all, (r) => OPEN.includes(r.status)),
+        medianAnswerSeconds: quantile(0.5),
+        p90AnswerSeconds: quantile(0.9),
+      },
+      failures7d: tally(week, (r) => r.failureReason),
+      dailyRequests,
+      safety: {
+        familiesWithCode: this.db.pins.filter((p2) => p2.pinHash).length,
+        childrenWithSafeAdult: this.db.children.filter((c) => (c.safeAdult ?? '').trim() !== '').length,
+        childrenWithOfflineHelpStep: new Set(
+          this.db.escalationRules.filter((r) => r.action === 'show_offline_help' && r.isActive).map((r) => r.childId),
+        ).size,
+      },
+      content: {
+        storiesTotal: this.db.stories.filter((s2) => !s2.deletedAt).length,
+        storiesApproved: this.db.stories.filter((s2) => !s2.deletedAt && s2.status === 'approved').length,
+        storiesDraft: this.db.stories.filter((s2) => !s2.deletedAt && s2.status === 'draft').length,
+        routinesTotal: this.db.routines.filter((r) => !r.deletedAt).length,
+      },
+      // Mirrors the SQL: below the threshold a per-type breakdown describes one
+      // child's day rather than a population, so it is withheld entirely.
+      requestsByType7d: families >= OPERATOR_TYPE_BREAKDOWN_MIN_FAMILIES
+        ? tally(week, (r) => r.typeSlug)
+        : null,
+      typeBreakdownThreshold: OPERATOR_TYPE_BREAKDOWN_MIN_FAMILIES,
+    };
   }
 
   // -- data rights ----------------------------------------------------------
