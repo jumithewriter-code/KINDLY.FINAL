@@ -12,14 +12,16 @@ interface KindlyEnv {
   supabaseAnonKey: string;
   siteUrl: string;
   isE2E: boolean;
+  /** True only in a built bundle, never in `vite dev`. */
+  isProduction: boolean;
   allowDemoSeed: boolean;
   /** Single-file demo build: in-process backend, hash routing, visible notice. */
   isDemo: boolean;
 }
 
-function readViteEnv(): Record<string, string | undefined> {
+function readViteEnv(): Record<string, string | boolean | undefined> {
   try {
-    return (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+    return (import.meta as unknown as { env?: Record<string, string | boolean | undefined> }).env ?? {};
   } catch {
     return {};
   }
@@ -30,18 +32,22 @@ let cached: KindlyEnv | null = null;
 export function env(): KindlyEnv {
   if (cached) return cached;
   const raw = readViteEnv();
+  // Vite writes most values as strings but a few (PROD, DEV) as booleans.
+  const str = (v: string | boolean | undefined): string | undefined =>
+    typeof v === 'string' ? v : v === undefined ? undefined : String(v);
   const isDemo = raw.VITE_KINDLY_DEMO === 'true';
-  const backend = isDemo || raw.VITE_KINDLY_BACKEND === 'memory' ? 'memory' : 'supabase';
+  const backend = isDemo || str(raw.VITE_KINDLY_BACKEND) === 'memory' ? 'memory' : 'supabase';
   cached = {
     backend,
-    supabaseUrl: raw.VITE_SUPABASE_URL ?? '',
-    supabaseAnonKey: raw.VITE_SUPABASE_ANON_KEY ?? '',
-    siteUrl: raw.VITE_PUBLIC_SITE_URL ?? (typeof window !== 'undefined' ? window.location.origin : ''),
+    supabaseUrl: str(raw.VITE_SUPABASE_URL) ?? '',
+    supabaseAnonKey: str(raw.VITE_SUPABASE_ANON_KEY) ?? '',
+    siteUrl: str(raw.VITE_PUBLIC_SITE_URL) ?? (typeof window !== 'undefined' ? window.location.origin : ''),
     isE2E: raw.VITE_KINDLY_E2E === 'true',
+    isProduction: str(raw.PROD) === 'true',
     allowDemoSeed: raw.VITE_KINDLY_ALLOW_DEMO_SEED === 'true',
     isDemo,
   };
-  return cached;
+  return cached!;
 }
 
 /** Used by tests to force a configuration. */

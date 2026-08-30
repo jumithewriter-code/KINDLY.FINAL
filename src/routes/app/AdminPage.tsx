@@ -68,6 +68,7 @@ export function AdminPage() {
       <AnsweredPanel metrics={data} />
       <ActivityPanel metrics={data} />
       <ReachPanel metrics={data} />
+      <FunnelPanel metrics={data} />
       <SafetyPanel metrics={data} />
       <DeliveryPanel metrics={data} />
       <ContentPanel metrics={data} />
@@ -216,6 +217,97 @@ function ReachPanel({ metrics }: { metrics: OperatorMetrics }) {
         <Tile label="Trusted caregivers" value={String(reach.trusted)} detail="Named, no account needed" tone="neutral" />
         <Tile label="Requests today" value={String(requests.last24h)} detail={`${requests.total} all time`} tone="neutral" />
         <Tile label="Cancelled" value={String(requests.cancelled7d)} detail="Child changed their mind" tone="neutral" />
+      </div>
+    </section>
+  );
+}
+
+function FunnelPanel({ metrics }: { metrics: OperatorMetrics }) {
+  const f = metrics.funnel30d;
+  const { active } = metrics;
+
+  // Each step is a subset of the one above, so the widths are all measured
+  // against the top of the funnel rather than against the previous step.
+  const steps = [
+    { label: 'Created an account', n: f.accountsCreated },
+    { label: 'Verified their email', n: f.verifiedEmail },
+    { label: 'Started onboarding', n: f.startedOnboarding },
+    { label: 'Joined a family space', n: f.joinedAFamily },
+    { label: 'Finished onboarding', n: f.finishedOnboarding },
+    { label: 'Their child sent a request', n: f.familySentRequest },
+  ];
+  const top = f.accountsCreated;
+
+  // The largest single drop is where the product is losing people.
+  let worst = { from: '', to: '', lost: 0 };
+  for (let i = 1; i < steps.length; i += 1) {
+    const lost = steps[i - 1]!.n - steps[i]!.n;
+    if (lost > worst.lost) worst = { from: steps[i - 1]!.label, to: steps[i]!.label, lost };
+  }
+
+  return (
+    <section className="admin-section" aria-labelledby="admin-funnel">
+      <h2 id="admin-funnel" className="admin-section-title">Where people stop</h2>
+      <p className="admin-section-note">
+        Accounts created in the last 30 days, followed through. Counts only &mdash; nobody is named.
+      </p>
+
+      <div className="admin-tiles" style={{ marginBottom: 14 }}>
+        <Tile label="Active today" value={String(active.seen24h)} detail={`${active.seen7d} this week`} tone="neutral" />
+        <Tile label="Accounts, all time" value={String(active.accountsTotal)} detail={`${f.accountsCreated} in the last 30 days`} tone="neutral" />
+        <Tile
+          label="Reached a first request"
+          value={top > 0 ? `${Math.round((f.familySentRequest / top) * 100)}%` : '—'}
+          detail={top > 0 ? `${f.familySentRequest} of ${top} new accounts` : 'No new accounts'}
+          tone={top === 0 ? 'neutral' : f.familySentRequest / top >= 0.4 ? 'good' : 'warning'}
+        />
+      </div>
+
+      <div className="admin-card">
+        {top === 0 ? (
+          <p className="admin-empty">No accounts created in the last 30 days.</p>
+        ) : (
+          <>
+            <ol className="admin-funnel">
+              {steps.map((step, i) => {
+                const pct = Math.round((step.n / top) * 100);
+                const lostHere = i === 0 ? 0 : steps[i - 1]!.n - step.n;
+                return (
+                  <li key={step.label}>
+                    <div className="admin-funnel-head">
+                      <span>{step.label}</span>
+                      {/* The separator is real text, not margin: read aloud,
+                          "3" followed by "100%" would otherwise run together
+                          into "3100%". */}
+                      <b>
+                        {step.n}
+                        <small> &middot; {pct}% of new accounts</small>
+                      </b>
+                    </div>
+                    <div className="admin-funnel-track">
+                      <div className="admin-funnel-fill" style={{ width: `${Math.max(pct, 1)}%` }} />
+                    </div>
+                    {lostHere > 0 ? (
+                      <span className="admin-funnel-drop">
+                        {lostHere} {lostHere === 1 ? 'person' : 'people'} stopped here
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+            {worst.lost > 0 ? (
+              <p className="note-strip" style={{ marginTop: 16 }}>
+                <Icon name="i-alert" size={16} strokeWidth={2.5} />
+                <span>
+                  The biggest drop is between <strong>{worst.from.toLowerCase()}</strong> and{' '}
+                  <strong>{worst.to.toLowerCase()}</strong> &mdash; {worst.lost}{' '}
+                  {worst.lost === 1 ? 'person' : 'people'}.
+                </span>
+              </p>
+            ) : null}
+          </>
+        )}
       </div>
     </section>
   );

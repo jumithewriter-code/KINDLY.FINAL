@@ -179,6 +179,50 @@ begin
          where action = 'show_offline_help' and is_active)
     ),
 
+    -- Where people stop.
+    --
+    -- Each step is cumulative: a person counts at step N only if they also met
+    -- every step before it. Defining it any other way lets a later step exceed
+    -- an earlier one — an invited caregiver joins a family space without ever
+    -- going through onboarding — and a funnel that widens is measuring two
+    -- different populations and calling it one journey.
+    'funnel_30d', (
+      with cohort as (
+        select
+          u.id,
+          u.email_verified_at is not null as verified,
+          cp.user_id is not null          as has_profile,
+          cp.onboarding_stage = 'complete' as onboarded,
+          exists (select 1 from public.family_members m where m.user_id = u.id) as in_family,
+          exists (select 1
+                    from public.family_members m
+                    join public.requests r on r.family_id = m.family_id
+                   where m.user_id = u.id) as family_asked
+        from public.users u
+        left join public.caregiver_profiles cp
+               on cp.user_id = u.id and cp.deleted_at is null
+       where u.created_at > v_now - interval '30 days'
+         and u.deleted_at is null
+      )
+      select jsonb_build_object(
+        'accounts_created',    count(*),
+        'verified_email',      count(*) filter (where verified),
+        'started_onboarding',  count(*) filter (where verified and has_profile),
+        'joined_a_family',     count(*) filter (where verified and has_profile and in_family),
+        'finished_onboarding', count(*) filter (where verified and has_profile and in_family and onboarded),
+        'family_sent_request', count(*) filter (where verified and has_profile and in_family and onboarded and family_asked)
+      )
+      from cohort
+    ),
+
+    'active', jsonb_build_object(
+      'seen_24h', (select count(*) from public.users
+                    where last_seen_at > v_now - interval '24 hours' and deleted_at is null),
+      'seen_7d',  (select count(*) from public.users
+                    where last_seen_at > v_now - interval '7 days' and deleted_at is null),
+      'accounts_total', (select count(*) from public.users where deleted_at is null)
+    ),
+
     'content', jsonb_build_object(
       'stories_total',    (select count(*) from public.stories),
       'stories_approved', (select count(*) from public.stories where status = 'approved'),

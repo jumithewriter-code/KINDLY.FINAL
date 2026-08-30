@@ -135,6 +135,22 @@ select id, 'me' from auth.users where email = 'you@example.com';
 read it, discover who is on it, or write to it, so a caregiver cannot promote
 themselves. To remove someone, delete their row.
 
+### 2d. Turn on traffic analytics
+
+The app ships `@vercel/analytics`, mounted in `src/main.tsx` and active only in
+a production build — never in `vite dev`, the e2e build, or the single-file
+demo. It still needs enabling once on Vercel: your project &rarr; Analytics &rarr;
+Enable. Figures then appear in the Vercel dashboard, not inside KINDLY.
+
+It measures traffic and nothing else: URL, referrer, and coarse device and
+country. It is cookieless and stores no per-visitor identifier, which is why
+KINDLY carries no consent banner &mdash; there is nothing stored to consent to.
+It never sees a name, a request, or anything typed into the app.
+
+Nothing in the CSP needs changing: in production the script and its beacon are
+both same-origin under `/_vercel/insights/`, already covered by `script-src
+'self'` and `connect-src 'self'`.
+
 ## 3. Build with real credentials
 
 ```bash

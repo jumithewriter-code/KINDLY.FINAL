@@ -62,7 +62,7 @@ function weakHash(value: string, salt = 'kindly'): string {
   return `mh$${h1.toString(36)}${h2.toString(36)}`;
 }
 
-interface DbUser { id: string; email: string; passwordHash: string; emailVerifiedAt: string | null; deletedAt: string | null }
+interface DbUser { id: string; email: string; passwordHash: string; emailVerifiedAt: string | null; createdAt: string; lastSeenAt: string | null; deletedAt: string | null }
 interface DbMember extends Permissions { familyId: string; userId: string; role: FamilyMember['role']; joinedAt: string; revokedAt: string | null }
 interface DbInvitation { id: string; familyId: string; invitedEmail: string; invitedName: string | null; role: FamilyMember['role']; tokenHash: string; status: string; expiresAt: string; invitedBy: string }
 interface DbPin { familyId: string; pinHash: string | null; mode: 'pin' | 'device_biometric' | 'none'; failedAttempts: number; lockedUntil: string | null }
@@ -365,7 +365,7 @@ export class MemoryBackend implements KindlyBackend {
       // The emulated project has email confirmation switched off so the tests
       // exercise the signed-in path; the verification banner is still driven by
       // this flag and can be flipped by MemoryBackend.setEmailVerified().
-      emailVerifiedAt: nowIso(), deletedAt: null,
+      emailVerifiedAt: nowIso(), createdAt: nowIso(), lastSeenAt: nowIso(), deletedAt: null,
     };
     this.db.users.push(user);
     this.commit();
@@ -1997,6 +1997,38 @@ export class MemoryBackend implements KindlyBackend {
         childrenWithOfflineHelpStep: new Set(
           this.db.escalationRules.filter((r) => r.action === 'show_offline_help' && r.isActive).map((r) => r.childId),
         ).size,
+      },
+      // Cumulative, exactly as the SQL defines it: a person counts at step N
+      // only if they also met every step before it. See migration 0014 for why
+      // a non-cumulative version can widen.
+      funnel30d: (() => {
+        const cohort = this.db.users
+          .filter((u) => !u.deletedAt && (at(u.createdAt) ?? 0) > since(30))
+          .map((u) => {
+            const profile = this.db.caregivers.find((c) => c.userId === u.id && !c.deletedAt);
+            const fams = new Set(this.db.members.filter((m) => m.userId === u.id).map((m) => m.familyId));
+            return {
+              verified: Boolean(u.emailVerifiedAt),
+              hasProfile: Boolean(profile),
+              onboarded: profile?.onboardingStage === 'complete',
+              inFamily: fams.size > 0,
+              familyAsked: this.db.requests.some((r) => fams.has(r.familyId)),
+            };
+          });
+        const upTo = (pred: (c: (typeof cohort)[number]) => boolean) => cohort.filter(pred).length;
+        return {
+          accountsCreated: cohort.length,
+          verifiedEmail: upTo((c) => c.verified),
+          startedOnboarding: upTo((c) => c.verified && c.hasProfile),
+          joinedAFamily: upTo((c) => c.verified && c.hasProfile && c.inFamily),
+          finishedOnboarding: upTo((c) => c.verified && c.hasProfile && c.inFamily && c.onboarded),
+          familySentRequest: upTo((c) => c.verified && c.hasProfile && c.inFamily && c.onboarded && c.familyAsked),
+        };
+      })(),
+      active: {
+        seen24h: this.db.users.filter((u) => !u.deletedAt && (at(u.lastSeenAt) ?? 0) > since(1)).length,
+        seen7d: this.db.users.filter((u) => !u.deletedAt && (at(u.lastSeenAt) ?? 0) > since(7)).length,
+        accountsTotal: this.db.users.filter((u) => !u.deletedAt).length,
       },
       content: {
         storiesTotal: this.db.stories.filter((s2) => !s2.deletedAt).length,

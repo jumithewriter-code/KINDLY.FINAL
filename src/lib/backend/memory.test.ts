@@ -830,6 +830,31 @@ describe('the operator dashboard', () => {
     expect(json).not.toContain(leoId);
   });
 
+  it('reports the signup funnel as counts that only ever narrow', async () => {
+    const me = (await rosa.getCurrentUser())!;
+    rosa.grantOperatorForTests(me.id);
+    const { funnel30d: f, active } = await rosa.getOperatorMetrics();
+
+    // Each step is a subset of the one above it. If that ever inverts, the
+    // funnel is measuring different populations at different steps.
+    const steps = [f.accountsCreated, f.verifiedEmail, f.startedOnboarding,
+                   f.joinedAFamily, f.finishedOnboarding, f.familySentRequest];
+    for (let i = 1; i < steps.length; i += 1) {
+      expect(steps[i]).toBeLessThanOrEqual(steps[i - 1]!);
+    }
+
+    // Three accounts are seeded: Rosa, Marcus and the outsider.
+    expect(f.accountsCreated).toBe(3);
+    expect(f.joinedAFamily).toBe(3);
+    expect(active.accountsTotal).toBe(3);
+
+    // And still nothing identifying.
+    const json = JSON.stringify({ f, active });
+    for (const secret of ['rosa@example.test', 'marcus@example.test', 'Rosa', 'Marcus']) {
+      expect(json).not.toContain(secret);
+    }
+  });
+
   it('withholds the request-type breakdown while too few families exist', async () => {
     const me = (await rosa.getCurrentUser())!;
     rosa.grantOperatorForTests(me.id);
