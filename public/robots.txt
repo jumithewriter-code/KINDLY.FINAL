@@ -1,0 +1,16 @@
+# KINDLY — instructions for search engine crawlers.
+#
+# This is a request, not a lock: reputable crawlers honour it, nothing forces
+# them to. What actually protects family data is sign-in and the database's
+# row-level security. Never list anything here that should stay secret — this
+# file is public.
+
+User-agent: *
+# The caregiver area, child mode, onboarding, and invitation links. Invitation
+# URLs carry a private code, so they must never be read into search results.
+Disallow: /app
+Disallow: /child
+Disallow: /onboarding
+Disallow: /invite
+
+Sitemap: https://kindlyapp.vercel.app/sitemap.xml
