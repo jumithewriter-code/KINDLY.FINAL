@@ -14,6 +14,13 @@ deployed project needs those applied separately — see `DEPLOY.md`.
   Until now these had only ever run on one developer's machine.
 - `docs/sdlc-process.md`, `docs/traceability-matrix.md`, `docs/risk-register.md`.
 
+### Fixed
+- The standalone single-file demo requested `/favicon.svg`, which resolves to
+  the filesystem root when the file is opened from disk and fails. The favicon
+  is now inlined as a data URI, and the build's standalone guard checks for any
+  absolute reference rather than only `/assets/` — the narrow guard is why this
+  shipped unnoticed. Found by CI on its first run.
+
 ### Known issues
 - Child mode can hang on "Opening your space…" when no child profile resolves or
   when starting a session fails — see RK-03 in the risk register. Reproduced,

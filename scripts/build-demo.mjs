@@ -8,7 +8,7 @@
  * to an environment variable someone might get wrong.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
@@ -63,8 +63,23 @@ ${js}
 // Any remaining preload hints point at files that no longer exist.
 html = html.replace(/<link[^>]*rel="modulepreload"[^>]*>\s*/g, '');
 
-if (html.includes('/assets/')) {
-  throw new Error('The demo still references external assets; it would not load standalone.');
+// The favicon is referenced by absolute path, which resolves to the filesystem
+// root when the demo is opened from disk and fails. Inline it so the demo keeps
+// its icon and still asks the network for nothing.
+const faviconPath = join(root, 'public', 'favicon.svg');
+if (existsSync(faviconPath)) {
+  const dataUri = `data:image/svg+xml;base64,${readFileSync(faviconPath).toString('base64')}`;
+  html = html.replace(/href="\/favicon\.svg"/g, `href="${dataUri}"`);
+}
+
+// A single-file demo that reaches for anything outside itself is not standalone.
+// This guard used to check only /assets/, which is why an absolute favicon path
+// shipped unnoticed until CI ran the demo from a file:// URL.
+const absolute = [...html.matchAll(/(?:href|src)="(\/[^"]*)"/g)].map((m) => m[1]);
+if (absolute.length) {
+  throw new Error(
+    `The demo still references files outside itself, so it would not load standalone: ${[...new Set(absolute)].join(', ')}`,
+  );
 }
 
 mkdirSync(site, { recursive: true });
