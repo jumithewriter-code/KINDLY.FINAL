@@ -132,7 +132,9 @@ src/test/              harness, setup, accessibility and component tests
 e2e/                   journey, accessibility, responsive
 docs/                  architecture, functionality matrix, schema + RLS, API
                        contract, seed data, accessibility report, limitations
-                       and safety, privacy considerations
+                       and safety, privacy considerations, SDLC process,
+                       traceability matrix, risk register
+.github/workflows/     CI: typecheck, tests, builds, end-to-end
 ```
 
 ## Environment

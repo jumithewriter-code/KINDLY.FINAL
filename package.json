@@ -1,7 +1,7 @@
 {
   "name": "kindly",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "KINDLY — a calm autism-support space for children and their caregivers.",
   "engines": {

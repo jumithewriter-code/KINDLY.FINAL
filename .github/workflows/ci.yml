@@ -1,0 +1,85 @@
+name: CI
+
+# Until now these checks only ever ran on one developer's machine, which meant
+# nothing stopped a commit that fails them from reaching production. For a
+# product whose main claim is that safety rules are enforced rather than
+# suggested, the tests proving those rules have to run where everyone can see
+# the result.
+#
+# The live-database suite is deliberately absent. It needs real project
+# credentials and it writes rows, so it stays a manual step run with
+# KINDLY_LIVE_TEST=1 against a project the operator chooses.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Strict TypeScript is part of the contract, not a formality: the wire
+      # shape of every server function is written out by hand so that a change
+      # in SQL that drops a field fails here rather than rendering as a silent
+      # zero on a dashboard.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit, integration and accessibility tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Build the single-file demo
+        run: npm run build:demo
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # CI has no system Chrome, so install Playwright's own browser. Locally
+      # the same suite runs with KINDLY_BROWSER_CHANNEL=chrome where a download
+      # is blocked.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the demo the e2e suite loads
+        run: npm run build:demo
+
+      # These run against the in-memory backend, so they touch no real family
+      # data and need no credentials.
+      - name: Playwright
+        run: npm run e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
